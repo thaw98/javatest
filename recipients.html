@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title th:text="${title}">Recipients</title>
+  <th:block th:replace="~{fragments/head :: head(${title})}"></th:block>
+  <link rel="stylesheet" th:href="@{/css/donor-admin.css}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    .page-header-icon{font-size:2rem;color:var(--primary-color);margin-right:.6rem}
+    .success-badge{background:var(--success-color);color:#fff;border-radius:20px;padding:.35rem .75rem;font-weight:700;display:inline-flex;align-items:center;gap:.35rem}
+    .search-filter-container{background:#fff;padding:1.25rem;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:1.5rem}
+    .search-input-wrapper{position:relative;flex:1;max-width:420px}
+    .search-input-wrapper i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#6c757d}
+    .search-input{width:100%;padding:.6rem .75rem .6rem 2.5rem;border:2px solid #e0e0e0;border-radius:8px;font-size:.9rem;transition:all .3s ease}
+    .search-input:focus{outline:none;border-color:var(--primary-color);box-shadow:0 0 0 3px rgba(72,149,239,.1)}
+    .filter-select{padding:.6rem 2.5rem .6rem .75rem;border:2px solid #e0e0e0;border-radius:8px;font-size:.9rem;font-weight:500;cursor:pointer;transition:all .3s ease;background:#fff;min-width:160px}
+    .filter-select:focus{outline:none;border-color:var(--primary-color);box-shadow:0 0 0 3px rgba(72,149,239,.1)}
+    .clear-btn{padding:.6rem 1.2rem;border:2px solid #e0e0e0;border-radius:8px;background:#fff;color:#6c757d;font-weight:600;font-size:.9rem;cursor:pointer;transition:all .3s ease;display:inline-flex;align-items:center;gap:.4rem}
+    .clear-btn:hover{background:#f8f9fa;border-color:#6c757d;color:#495057}
+    .no-results{text-align:center;padding:1.5rem 0;color:#6c757d}
+    #pager{--bs-pagination-color:var(--secondary-color);--bs-pagination-hover-color:var(--secondary-color);--bs-pagination-focus-box-shadow:0 0 0 .25rem rgba(198,40,40,.25);--bs-pagination-active-bg:var(--secondary-color);--bs-pagination-active-border-color:var(--secondary-color)}
+    .btn-disabled{opacity:.5;pointer-events:none}
+    .status-badge{font-size:0.8rem;padding:.45rem .75rem;font-weight:700;}
+    .date-cell{white-space:nowrap;word-break:keep-all;overflow-wrap:normal;}
+    #pager .page-link{ min-width:2.25rem; text-align:center }
+    #pager .page-item.active .page-link{ border-color: var(--secondary-color); }
+  </style>
+</head>
+<body>
+<div th:replace="~{fragments/sidebar :: sidebar(${active})}"></div>
+<div id="content">
+  <div th:replace="~{fragments/topnav :: topnav(${userName}, ${avatarUrl})}"></div>
+
+  <main class="container-fluid p-4">
+    <!-- Flash success message -->
+    <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+      <i class="bi bi-check-circle-fill me-2"></i>
+      <span th:text="${successMessage}">Transfer successful!</span>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <div class="mb-4 d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center">
+        <i class="bi bi-people-fill page-header-icon" style="color:#dc3545;"></i>
+        <div>
+          <h2 class="mb-0 fw-bold" style="color: var(--primary-color);">Recipients</h2>
+          <p class="text-muted mb-0">
+            <i class="bi bi-arrow-right-short"></i>
+            Hospital Name :
+            <span th:text="${hospitalTitle}">Hospital</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- add button + total badge -->
+      <div class="d-flex align-items-center gap-2">
+        <span class="success-badge">
+          <i class="bi bi-clock-history me-1"></i>
+          <span id="totalCount" th:text="${rows != null} ? ${rows.size()} : 0">0</span> Total
+        </span>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="card-body p-3">
+
+        <!-- Search + Filters -->
+        <div class="search-filter-container">
+          <div class="d-flex flex-wrap gap-3 align-items-center">
+            <div class="search-input-wrapper">
+              <i class="bi bi-search"></i>
+              <input type="text" id="searchInput" class="search-input" placeholder="Search by name or email...">
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+              <label for="urgencyFilter" class="mb-0 text-muted fw-semibold">
+                <i class="bi bi-lightning-charge"></i> Urgency:
+              </label>
+              <select id="urgencyFilter" class="filter-select">
+                <option value="">All Urgency</option>
+                <option value="HIGH">HIGH</option>
+                <option value="MEDIUM">MEDIUM</option>
+                <option value="LOW">LOW</option>
+              </select>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+              <label for="statusFilter" class="mb-0 text-muted fw-semibold">
+                <i class="bi bi-flag"></i> Status:
+              </label>
+              <select id="statusFilter" class="filter-select">
+                <option value="">All Status</option>
+                <option value="pending">pending</option>
+                <option value="completed">completed</option>
+                <option value="transferred">transferred</option>
+              </select>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+              <label for="bloodTypeFilter" class="mb-0 text-muted fw-semibold">
+                <i class="bi bi-droplet-half"></i> Blood Type:
+              </label>
+              <select id="bloodTypeFilter" class="filter-select">
+                <option value="">All Blood Types</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+              </select>
+            </div>
+
+            <button id="clearFilters" class="clear-btn" type="button">
+              <i class="bi bi-x-circle"></i> Clear
+            </button>
+
+            <div class="ms-auto">
+              <span class="text-muted">
+                Showing <strong id="visibleCount">0–0</strong> of
+                <strong id="totalFiltered">0</strong> recipients
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-responsive">
+          <table id="recipientsTable" class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+            <tr>
+              <th style="min-width: 170px;">Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Gender</th>
+              <th>DOB</th>
+              <th>Blood Type</th>
+              <th>Quantity</th>
+              <th>Request Date</th>
+              <th>Required Date</th>
+              <th>Urgency</th>
+              <th>Status</th>
+              <th style="min-width: 220px;">Address</th>
+              <th style="min-width: 260px;">Action</th>
+            </tr>
+            </thead>
+
+            <tbody id="recipientsBody">
+            <tr th:each="row : ${rows}"
+                class="recipient-row"
+                th:attr="data-urgency=${row.urgency}, data-status=${row.status}, data-blood-type=${row.bloodType}, data-can-complete=${row.canComplete}">
+
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi bi-person-circle text-secondary"></i>
+                  <span class="cell-name" th:text="${row.username}">-</span>
+                </div>
+              </td>
+
+              <td class="cell-email" th:text="${row.email}">-</td>
+              <td th:text="${row.phone} ?: '-'">-</td>
+              <td th:text="${row.gender} ?: '-'">-</td>
+              <td class="date-cell" th:text="${
+  row.dateOfBirth != null ?
+  #strings.substring(row.dateOfBirth.toString(),8,10) + '-' +
+  #strings.substring(row.dateOfBirth.toString(),5,7)  + '-' +
+  #strings.substring(row.dateOfBirth.toString(),0,4)
+  : '-'
+}">-</td>
+
+              <td>
+                <span th:if="${row.bloodType != null}" class="badge text-white cell-bloodtype"
+                      th:style="${row.bloodType == 'O+'  ? 'background-color: #c0392b;' :
+                                 row.bloodType == 'O-'  ? 'background-color: #c0392b;' :
+                                 row.bloodType == 'A+'  ? 'background-color: #c0392b;' :
+                                 row.bloodType == 'A-'  ? 'background-color: #c0392b;' :
+                                 row.bloodType == 'B+'  ? 'background-color: #c0392b;' :
+                                 row.bloodType == 'B-'  ? 'background-color: #c0392b;' :
+                                 row.bloodType == 'AB+' ? 'background-color: #c0392b;' :
+                                 row.bloodType == 'AB-' ? 'background-color: #c0392b;' : 'background-color:#c0392b;'}"
+                      th:text="${row.bloodType}">-</span>
+                <span th:if="${row.bloodType == null}" class="text-muted cell-bloodtype">-</span>
+              </td>
+
+              <td><span class="badge bg-light text-dark border" th:text="${row.quantity}">0</span></td>
+<td class="date-cell"
+    th:text="${row.requestDate != null ? #temporals.format(row.requestDate, 'dd-MM-yyyy') : '-'}">-</td>
+
+<td class="date-cell"
+    th:text="${row.requiredDate != null ? #temporals.format(row.requiredDate, 'dd-MM-yyyy') : '-'}">-</td>
+
+              <td>
+                <span th:if="${row.urgency != null}" class="badge text-white"
+                      th:style="${#strings.equalsIgnoreCase(row.urgency, 'HIGH') || #strings.equalsIgnoreCase(row.urgency, 'URGENT') || #strings.equalsIgnoreCase(row.urgency, 'CRITICAL') ? 'background-color: #c82333;' :
+                                 #strings.equalsIgnoreCase(row.urgency, 'MEDIUM') || #strings.equalsIgnoreCase(row.urgency, 'MODERATE') ? 'background-color: #e74c3c;' :
+                                 #strings.equalsIgnoreCase(row.urgency, 'LOW') || #strings.equalsIgnoreCase(row.urgency, 'ROUTINE') ? 'background-color: #fd7e14;' :
+                                 'background-color: #6c757d;'}"
+                      th:text="${row.urgency}">-</span>
+                <span th:if="${row.urgency == null}" class="text-muted">-</span>
+              </td>
+
+              <!-- STATUS (no 'to <hospital>' text anymore) -->
+              <td>
+                <span th:if="${row.status != null}"
+                      class="badge status-badge"
+                      th:classappend="${#strings.equalsIgnoreCase(row.status, 'COMPLETED')   ? ' bg-success text-white' :
+                                       #strings.equalsIgnoreCase(row.status, 'PENDING')     ? ' bg-warning text-dark'  :
+                                       #strings.equalsIgnoreCase(row.status, 'IN_PROGRESS') ? ' bg-primary text-white' :
+                                       #strings.equalsIgnoreCase(row.status, 'CANCELLED')   ? ' bg-danger text-white'  :
+                                       ' bg-secondary text-white'}"
+                      th:style="${#strings.equalsIgnoreCase(row.status, 'TRANSFERRED') ? 'background-color:#6c757d;color:#fff;' : ''}"
+                      th:text="${row.status}">-</span>
+                <span th:if="${row.status == null}" class="text-muted">-</span>
+              </td>
+
+              <td th:text="${row.address} ?: '-'">-</td>
+
+              <!-- ACTIONS -->
+<td class="action-cell">
+  <!-- TRANSFERRED: show a faded Complete + a View button -->
+  <div class="d-flex w-100 gap-2"
+       th:if="${#strings.equalsIgnoreCase(row.status,'TRANSFERRED')}">
+    <!-- faded/disabled Complete -->
+    <button type="button"
+            class="btn btn-success complete-btn btn-disabled"
+            disabled>
+      Complete
+    </button>
+
+    <!-- View Transferred Hospital -->
+    <button type="button"
+            class="btn btn-secondary d-flex align-items-center justify-content-center w-50"
+            data-bs-toggle="modal"
+            th:attr="data-bs-target=${'#viewTransferModal-' + row.requestId}"
+            aria-label="View transferred hospital">
+      View
+    </button>
+  </div>
+
+                <!-- Otherwise: normal Complete + Transfer actions -->
+                <div class="d-flex gap-2"
+                     th:if="${!#strings.equalsIgnoreCase(row.status,'TRANSFERRED')}">
+                  <form th:action="@{/admin/recipients/{id}/complete(id=${row.requestId})}" method="post" style="display:inline">
+                    <input type="hidden" name="bloodTypeId" th:value="${row.bloodTypeId}">
+                    <input type="hidden" name="quantity"    th:value="${row.quantity}">
+                    <button type="submit" class="btn btn-success complete-btn"
+                            th:disabled="${#strings.equalsIgnoreCase(row.status,'COMPLETED') or !row.canComplete}">
+                      Complete
+                    </button>
+                  </form>
+
+                  <button type="button"
+                          class="btn btn-outline-danger transfer-btn w-50"
+                          data-bs-toggle="modal"
+                          th:attr="data-bs-target=${'#transferModal-' + row.requestId}"
+                          th:disabled="${#strings.equalsIgnoreCase(row.status,'COMPLETED')}">
+                    Transfer
+                  </button>
+                </div>
+
+                <!-- Transfer modal (for non-transferred rows) -->
+                <div class="modal fade"
+                     th:id="${'transferModal-' + row.requestId}"
+                     tabindex="-1"
+                     th:if="${!#strings.equalsIgnoreCase(row.status,'TRANSFERRED')}">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <form th:action="@{/admin/recipients/{id}/transfer(id=${row.requestId})}" method="post">
+                        <div class="modal-header">
+                          <h5 class="modal-title">Transfer Request</h5>
+                          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                          <p class="mb-2">
+                            Transfer the blood request of
+                            <strong th:text="${row.quantity}">0</strong> unit(s) of
+                            <strong th:text="${row.bloodType}">A+</strong>
+                            from
+                            <strong th:text="${row.hospitalName}">Hospital</strong>
+                            to:
+                          </p>
+<select name="targetHospitalId" class="form-select" required>
+  <option value="" disabled selected>Select target hospital</option>
+
+  <!-- Only hospitals that have sufficient stock for this row -->
+  <option th:each="h : ${hospitals}"
+          th:if="${row.eligibleTargetHospitalIds != null
+                  and #lists.contains(row.eligibleTargetHospitalIds, h.id)}"
+          th:value="${h.id}"
+          th:text="${h.hospitalName}">
+  </option>
+</select>
+
+                          <input type="hidden" name="bloodTypeId" th:value="${row.bloodTypeId}">
+                          <input type="hidden" name="quantity"    th:value="${row.quantity}">
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                          <button type="submit" class="btn btn-danger">Transfer</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- View Transferred Hospital modal (shown only when transferred) -->
+                <div class="modal fade"
+                     th:id="${'viewTransferModal-' + row.requestId}"
+                     tabindex="-1"
+                     th:if="${#strings.equalsIgnoreCase(row.status,'TRANSFERRED')}">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-hospital-fill me-2 text-secondary"></i>
+    View Transferred Hospital
+  </h5>
+  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+                      <div class="modal-body">
+                        <p class="mb-0">
+                          This blood request was transferred to
+                          <strong th:text="${row.targetHospitalName != null ? row.targetHospitalName : 'Unknown hospital'}">Target Hospital</strong>.
+                        </p>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </td>
+            </tr>
+
+            <tr id="noResults" style="display:none;">
+              <td colspan="13" class="no-results">
+                <i class="bi bi-search"></i>
+                <div>No recipients found</div>
+                <small class="text-muted">Try adjusting your search or filters</small>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <nav id="pagerNav" aria-label="Recipients pagination" class="d-flex justify-content-center p-3">
+          <ul id="pager" class="pagination mb-0"></ul>
+        </nav>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function(){
+  const PAGE_SIZE = 5;
+  const searchInput     = document.getElementById('searchInput');
+  const urgencyFilter   = document.getElementById('urgencyFilter');
+  const statusFilter    = document.getElementById('statusFilter');
+  const bloodTypeFilter = document.getElementById('bloodTypeFilter');
+  const clearBtn        = document.getElementById('clearFilters');
+  const tbody           = document.getElementById('recipientsBody');
+  const allRows         = Array.from(tbody.querySelectorAll('.recipient-row'));
+  const noResults       = document.getElementById('noResults');
+  const visibleText     = document.getElementById('visibleCount');
+  const totalFiltered   = document.getElementById('totalFiltered');
+  const totalBadge      = document.getElementById('totalCount');
+  const pagerUl         = document.getElementById('pager');
+  let filteredRows      = allRows.slice();
+  let currentPage       = 1;
+
+  if (totalBadge && totalBadge.textContent.trim() === '0') {
+    totalBadge.textContent = allRows.length.toString();
+  }
+
+  function normalize(v){ return (v || '').toString().trim().toUpperCase(); }
+
+  function rowMatches(row) {
+    const term   = (searchInput.value || '').trim().toLowerCase();
+    const wantUrg= normalize(urgencyFilter.value);
+    const wantSt = (statusFilter.value || '').trim().toLowerCase();
+    const wantBt = normalize(bloodTypeFilter.value);
+    const name  = (row.querySelector('.cell-name')?.textContent || '').toLowerCase();
+    const email = (row.querySelector('.cell-email')?.textContent || '').toLowerCase();
+    const rowUrg = normalize(row.dataset.urgency);
+    const rowSt  = (row.dataset.status || '').trim().toLowerCase();
+    const rowBt  = normalize(row.dataset.bloodType || row.querySelector('.cell-bloodtype')?.textContent);
+    const matchesSearch = !term || name.includes(term) || email.includes(term);
+    const matchesUrg    = !wantUrg || rowUrg === wantUrg;
+    const matchesSt     = !wantSt  || rowSt  === wantSt;
+    const matchesBt     = !wantBt  || rowBt  === wantBt;
+    return matchesSearch && matchesUrg && matchesSt && matchesBt;
+  }
+
+  function totalPages() { return Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE)); }
+
+  function buildPager() {
+    const pages = totalPages();
+    pagerUl.innerHTML = '';
+
+    function pageItem(label, enabled, targetPage, aria, isActive = false) {
+      const li = document.createElement('li');
+      li.className = 'page-item' + (enabled ? '' : ' disabled') + (isActive ? ' active' : '');
+      const a = document.createElement('a');
+      a.className = 'page-link';
+      a.href = '#';
+      a.textContent = label;
+      if (aria) a.setAttribute('aria-label', aria);
+      if (isActive) a.setAttribute('aria-current', 'page');
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!enabled || isActive) return;
+        currentPage = targetPage;
+        render();
+      });
+      li.appendChild(a);
+      return li;
+    }
+
+    function ellipsisItem() {
+      const li = document.createElement('li');
+      li.className = 'page-item disabled';
+      li.innerHTML = '<span class="page-link">…</span>';
+      return li;
+    }
+
+    pagerUl.appendChild(pageItem('First', currentPage > 1, 1, 'First page'));
+    pagerUl.appendChild(pageItem('Prev', currentPage > 1, Math.max(1, currentPage - 1), 'Previous page'));
+
+    const maxVisible = 5;
+    const pagesToShow = [];
+
+    if (pages <= maxVisible + 2) {
+      for (let p = 1; p <= pages; p++) pagesToShow.push(p);
+    } else {
+      pagesToShow.push(1);
+
+      let start = Math.max(2, currentPage - Math.floor(maxVisible / 2));
+      let end   = Math.min(pages - 1, currentPage + Math.floor(maxVisible / 2));
+
+      while (end - start + 1 < maxVisible) {
+        if (start > 2) start--;
+        else if (end < pages - 1) end++;
+        else break;
+      }
+
+      if (start > 2) pagesToShow.push('…');
+      for (let p = start; p <= end; p++) pagesToShow.push(p);
+      if (end < pages - 1) pagesToShow.push('…');
+
+      pagesToShow.push(pages);
+    }
+
+    pagesToShow.forEach(item => {
+      if (item === '…') {
+        pagerUl.appendChild(ellipsisItem());
+      } else {
+        const p = Number(item);
+        pagerUl.appendChild(pageItem(String(p), true, p, `Page ${p}`, p === currentPage));
+      }
+    });
+
+    pagerUl.appendChild(pageItem('Next', currentPage < pages, Math.min(pages, currentPage + 1), 'Next page'));
+    pagerUl.appendChild(pageItem('Last', currentPage < pages, pages, 'Last page'));
+  }
+
+  function render() {
+    allRows.forEach(r => r.style.display = 'none');
+    const startIdx = (currentPage - 1) * PAGE_SIZE;
+    const endIdx   = Math.min(startIdx + PAGE_SIZE, filteredRows.length);
+    for (let i = startIdx; i < endIdx; i++) {
+      if (filteredRows[i]) filteredRows[i].style.display = '';
+    }
+    const total = filteredRows.length;
+    visibleText.textContent = total ? `${startIdx + 1}–${endIdx}` : '0–0';
+    totalFiltered.textContent = total.toString();
+    noResults.style.display = total === 0 ? '' : 'none';
+    buildPager();
+    updateButtonStates();
+  }
+
+  function applyFilters() {
+    filteredRows = allRows.filter(rowMatches);
+    currentPage = 1;
+    render();
+  }
+
+  function updateButtonStates() {
+    filteredRows.forEach(row => {
+      const status = (row.dataset.status || '').toLowerCase();
+      const canComplete = row.dataset.canComplete === 'true';
+      const completeBtn = row.querySelector('.complete-btn');
+      const transferBtn = row.querySelector('.transfer-btn');   // may be null on transferred rows
+
+      if (status === 'transferred') {
+        completeBtn?.classList.add('btn-disabled'); // keep complete disabled
+        // no transfer button here; a "view" button is shown instead
+        return;
+      }
+      if (status === 'completed') {
+        completeBtn?.classList.add('btn-disabled');
+        transferBtn?.classList.add('btn-disabled');
+        return;
+      }
+
+      completeBtn?.classList.toggle('btn-disabled', !canComplete);
+      transferBtn?.classList.remove('btn-disabled');
+    });
+  }
+
+  searchInput?.addEventListener('input', applyFilters);
+  urgencyFilter?.addEventListener('change', applyFilters);
+  statusFilter?.addEventListener('change', applyFilters);
+  bloodTypeFilter?.addEventListener('change', applyFilters);
+  clearBtn?.addEventListener('click', () => {
+    searchInput.value = '';
+    urgencyFilter.value = '';
+    statusFilter.value = '';
+    bloodTypeFilter.value = '';
+    applyFilters();
+  });
+
+  applyFilters();
+})();
+
+// auto fade out flash messages after 3s
+setTimeout(() => {
+  document.querySelectorAll('.alert').forEach(a => {
+    const alert = bootstrap.Alert.getOrCreateInstance(a);
+    alert.close();
+  });
+}, 3000);
+</script>
+</body>
+</html>
