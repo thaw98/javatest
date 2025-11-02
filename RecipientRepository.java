@@ -1,7 +1,6 @@
 package com.grppj.donateblood.repository;
 
 import com.grppj.donateblood.model.AppointmentStatus;
-import com.grppj.donateblood.model.BloodRequest;
 import com.grppj.donateblood.model.Urgency;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,6 +34,7 @@ public class RecipientRepository {
                 br.hospital_id        AS hospital_id,
                 br.blood_type_id      AS blood_type_id,
                 br.target_hospital_id AS target_hospital_id,      -- NEW
+                br.cancel_reason      AS cancel_reason,
 
                 u.username            AS username,
                 u.email               AS email,
@@ -103,6 +103,8 @@ public class RecipientRepository {
         // NEW: transferred-to hospital
         r.setTargetHospitalId((Integer) rs.getObject("target_hospital_id")); // null-safe
         r.setTargetHospitalName(rs.getString("target_hospital_name"));
+        
+        r.setCancelReason(rs.getString("cancel_reason"));
 
         r.setUsername(rs.getString("username"));
         r.setEmail(rs.getString("email"));
@@ -413,45 +415,10 @@ public class RecipientRepository {
         public void setTargetHospitalId(Integer v) { targetHospitalId = v; }
         public String getTargetHospitalName() { return targetHospitalName; }
         public void setTargetHospitalName(String v) { targetHospitalName = v; }
+        
+        private String cancelReason; // ⬅️ new
+
+        public String getCancelReason() { return cancelReason; }
+        public void setCancelReason(String v) { cancelReason = v; }
     }
-    
-    
-    public BloodRequest findMessageById(int id) {
-        String sql = """
-            SELECT id, user_id, hospital_id, blood_type_id, quantity, required_date, urgency, status
-              FROM blood_request
-             WHERE id = ?
-        """;
-
-        List<BloodRequest> list = jdbcTemplate.query(sql, (rs, rowNum) -> {
-            BloodRequest req = new BloodRequest();
-            req.setId(rs.getInt("id"));
-            req.setUserId(rs.getInt("user_id"));
-            req.setHospitalId(rs.getInt("hospital_id"));
-            req.setBloodTypeId(rs.getInt("blood_type_id"));
-            req.setQuantity(rs.getInt("quantity"));
-            req.setRequiredDate(rs.getDate("required_date").toLocalDate());
-
-            String urgencyStr = rs.getString("urgency");
-            if (urgencyStr != null) {
-                req.setUrgency(Urgency.valueOf(urgencyStr.toUpperCase()));
-            }
-
-            String statusStr = rs.getString("status");
-            if (statusStr != null) {
-                req.setStatus(AppointmentStatus.valueOf(statusStr.toLowerCase()));
-            }
-
-            return req;
-        }, id);
-
-        return list.isEmpty() ? null : list.get(0);
-    }
-    
-    public LocalDate getAppointmentDateById(int requestId) {
-        String sql = "SELECT appointment_date FROM recipient_request WHERE id = ?";
-        return jdbcTemplate.queryForObject(sql, LocalDate.class, requestId);
-    }
-
-
 }

@@ -13,12 +13,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.grppj.donateblood.model.AppointmentStatus;
-import com.grppj.donateblood.model.BloodRequest;
 import com.grppj.donateblood.model.Urgency;
 import com.grppj.donateblood.repository.BloodTypeRepository;
 import com.grppj.donateblood.repository.HospitalRepository;
 import com.grppj.donateblood.repository.RecipientRepository;
-import com.grppj.donateblood.repository.UserMessageRepository;
+import com.grppj.donateblood.repository.UserMessageRepository; // ⬅️ NEW import
 
 import java.time.LocalDate;
 
@@ -29,22 +28,22 @@ public class RecipientAdminController {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private UserMessageRepository userMessageRepository; // ⬅️ NEW
+
     private final RecipientRepository recipientRepository;
     private final HospitalRepository hospitalRepository;
     private final BloodTypeRepository bloodTypeRepository;
-    private final UserMessageRepository userMessageRepo;
 
     public RecipientAdminController(RecipientRepository recipientRepository,
                                     HospitalRepository hospitalRepository,
-                                    BloodTypeRepository bloodTypeRepository,
-                                    UserMessageRepository userMessageRepo) {
+                                    BloodTypeRepository bloodTypeRepository) {
         this.recipientRepository = recipientRepository;
         this.hospitalRepository = hospitalRepository;
         this.bloodTypeRepository = bloodTypeRepository;
-        this.userMessageRepo    =   userMessageRepo;
     }
 
- // RecipientAdminController.java
+    // RecipientAdminController.java
     @GetMapping("/recipients")
     public String recipients(Model model, HttpSession session) {
         Integer hospitalId = (Integer) session.getAttribute("HOSPITAL_ID");
@@ -102,7 +101,6 @@ public class RecipientAdminController {
     public String showAddForm(Model model, HttpSession session) {
         AdminBloodRequestForm form = new AdminBloodRequestForm();
         form.setPassword("default123");
-        // form.setUrgency(null); // leave null so "-- Select Urgency --" shows
         form.setRequiredDate(null);
 
         Integer hospitalId = (Integer) session.getAttribute("HOSPITAL_ID");
@@ -202,7 +200,7 @@ public class RecipientAdminController {
                 form.getUrgency(),
                 AppointmentStatus.pending,
                 adminUserId,
-                /* requiredDate */ reqDate   // <— use the parsed date
+                /* requiredDate */ reqDate
         );
 
         ra.addFlashAttribute("successMessage", "Blood request created.");
@@ -223,20 +221,6 @@ public class RecipientAdminController {
             int adminUserId = (session.getAttribute("USER_ID") instanceof Integer)
                     ? (Integer) session.getAttribute("USER_ID") : 0;
             recipientRepository.updateStatusAndInsertFulfillment(requestId, hospitalId, adminUserId, quantity);
-            
-            String hospitalName = hospitalRepository.findNameById(hospitalId);
-        
-            BloodRequest request = recipientRepository.findMessageById(requestId);
-            if (request != null) {
-                int recipientUserId = request.getUserId();
-                LocalDate appointmentDate = recipientRepository.getAppointmentDateById(requestId);
-
-                String message = "Your blood request has been successfully fulfilled by " + hospitalName + ".\n\n"
-                        + "Please come to the hospital to collect the blood on " + appointmentDate + " during our working hours.\n\n"
-                        + "Thank you for placing your trust in " + hospitalName + ".";
-                userMessageRepo.sendMessage(hospitalId, recipientUserId, message);
-            }
-        
         }
         return "redirect:/admin/recipients";
     }
@@ -250,6 +234,69 @@ public class RecipientAdminController {
             ra.addFlashAttribute("successMessage", "Request transferred to target hospital.");
         } catch (Exception e) {
             ra.addFlashAttribute("errorMessage", e.getMessage());
+        }
+        return "redirect:/admin/recipients";
+    }
+
+    @PostMapping("/recipients/{id}/cancel")
+    public String cancelRequest(@PathVariable("id") int requestId,
+                                @RequestParam("reason") String reason,
+                                @RequestParam(value = "details", required = false) String details,
+                                RedirectAttributes ra,
+                                HttpSession session) {
+
+        String finalReason = (reason == null) ? "" : reason.trim();
+
+        if ("Other".equalsIgnoreCase(finalReason)) {
+            finalReason = (details != null && !details.trim().isEmpty())
+                    ? details.trim()
+                    : "Other";
+        } else if (details != null && !details.trim().isEmpty()) {
+            finalReason = finalReason + " — " + details.trim();
+        }
+
+        int updated = jdbcTemplate.update("""
+            UPDATE blood_request
+               SET status = 'cancelled',
+                   cancel_reason = ?,
+                   cancelled_at = NOW()
+             WHERE id = ? AND status <> 'cancelled'
+        """, finalReason, requestId);
+
+        if (updated == 1) {
+            // ---- Send a typed message to the recipient user (no title column) ----
+            Integer senderHospitalId = (Integer) session.getAttribute("HOSPITAL_ID");
+            if (senderHospitalId == null) {
+                senderHospitalId = recipientRepository.findHospitalIdForRequest(requestId);
+            }
+
+            var ctx = jdbcTemplate.queryForMap("""
+                SELECT br.id AS request_id,
+                       br.user_id,
+                       br.quantity,
+                       bt.blood_type,
+                       COALESCE(u.username, 'Unknown Patient') AS patient_name
+                  FROM blood_request br
+                  JOIN blood_type bt ON bt.id = br.blood_type_id
+                  LEFT JOIN `user` u  ON u.id = br.user_id
+                 WHERE br.id = ?
+            """, requestId);
+
+            int receiverUserId = ((Number) ctx.get("user_id")).intValue();
+
+            // Prefix type marker; UI will render a derived title "Blood Request Cancelled"
+            String typedMessage = "Cancellation Reason : " + finalReason;
+            // (optional context)
+            // typedMessage = "CANCELLED|Request #" + ctx.get("request_id") + " — " + finalReason;
+
+            try {
+                userMessageRepository.sendMessage(senderHospitalId, receiverUserId, typedMessage);
+            } catch (Exception ignore) { /* log if desired */ }
+            // ----------------------------------------------------------------------
+
+            ra.addFlashAttribute("successMessage", "Request cancelled.");
+        } else {
+            ra.addFlashAttribute("errorMessage", "Unable to cancel this request.");
         }
         return "redirect:/admin/recipients";
     }
@@ -269,8 +316,7 @@ public class RecipientAdminController {
         private Integer bloodTypeId;
         private Integer quantity;
         private Urgency urgency;
-        private String requiredDate;   // NEW: "yyyy-MM-dd" from <input type="date">
-
+        private String requiredDate;   // "yyyy-MM-dd" from <input type="date">
 
         // Context
         private Integer hospitalId;

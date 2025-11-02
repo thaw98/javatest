@@ -33,10 +33,15 @@
   <div th:replace="~{fragments/topnav :: topnav(${userName}, ${avatarUrl})}"></div>
 
   <main class="container-fluid p-4">
-    <!-- Flash success message -->
+    <!-- Flash success/error message -->
     <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
       <i class="bi bi-check-circle-fill me-2"></i>
-      <span th:text="${successMessage}">Transfer successful!</span>
+      <span th:text="${successMessage}">Success</span>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      <span th:text="${errorMessage}">Error</span>
       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 
@@ -53,7 +58,6 @@
         </div>
       </div>
 
-      <!-- add button + total badge -->
       <div class="d-flex align-items-center gap-2">
         <span class="success-badge">
           <i class="bi bi-clock-history me-1"></i>
@@ -94,6 +98,7 @@
                 <option value="pending">pending</option>
                 <option value="completed">completed</option>
                 <option value="transferred">transferred</option>
+                <option value="cancelled">cancelled</option>
               </select>
             </div>
 
@@ -144,12 +149,16 @@
               <th>Urgency</th>
               <th>Status</th>
               <th style="min-width: 220px;">Address</th>
-              <th style="min-width: 260px;">Action</th>
+              <th style="min-width: 320px;">Action</th>
             </tr>
             </thead>
 
             <tbody id="recipientsBody">
             <tr th:each="row : ${rows}"
+                th:with="
+                  isTransferred=${row != null and row.status != null and #strings.equalsIgnoreCase(row.status,'TRANSFERRED')},
+                  isCancelled=${row != null and row.status != null and #strings.equalsIgnoreCase(row.status,'CANCELLED')}
+                "
                 class="recipient-row"
                 th:attr="data-urgency=${row.urgency}, data-status=${row.status}, data-blood-type=${row.bloodType}, data-can-complete=${row.canComplete}">
 
@@ -163,46 +172,40 @@
               <td class="cell-email" th:text="${row.email}">-</td>
               <td th:text="${row.phone} ?: '-'">-</td>
               <td th:text="${row.gender} ?: '-'">-</td>
+
               <td class="date-cell" th:text="${
-  row.dateOfBirth != null ?
-  #strings.substring(row.dateOfBirth.toString(),8,10) + '-' +
-  #strings.substring(row.dateOfBirth.toString(),5,7)  + '-' +
-  #strings.substring(row.dateOfBirth.toString(),0,4)
-  : '-'
-}">-</td>
+                  row.dateOfBirth != null ?
+                  #strings.substring(row.dateOfBirth.toString(),8,10) + '-' +
+                  #strings.substring(row.dateOfBirth.toString(),5,7)  + '-' +
+                  #strings.substring(row.dateOfBirth.toString(),0,4)
+                  : '-'
+              }">-</td>
 
               <td>
                 <span th:if="${row.bloodType != null}" class="badge text-white cell-bloodtype"
-                      th:style="${row.bloodType == 'O+'  ? 'background-color: #c0392b;' :
-                                 row.bloodType == 'O-'  ? 'background-color: #c0392b;' :
-                                 row.bloodType == 'A+'  ? 'background-color: #c0392b;' :
-                                 row.bloodType == 'A-'  ? 'background-color: #c0392b;' :
-                                 row.bloodType == 'B+'  ? 'background-color: #c0392b;' :
-                                 row.bloodType == 'B-'  ? 'background-color: #c0392b;' :
-                                 row.bloodType == 'AB+' ? 'background-color: #c0392b;' :
-                                 row.bloodType == 'AB-' ? 'background-color: #c0392b;' : 'background-color:#c0392b;'}"
+                      th:style="${'background-color:#c0392b;'}"
                       th:text="${row.bloodType}">-</span>
                 <span th:if="${row.bloodType == null}" class="text-muted cell-bloodtype">-</span>
               </td>
 
               <td><span class="badge bg-light text-dark border" th:text="${row.quantity}">0</span></td>
-<td class="date-cell"
-    th:text="${row.requestDate != null ? #temporals.format(row.requestDate, 'dd-MM-yyyy') : '-'}">-</td>
 
-<td class="date-cell"
-    th:text="${row.requiredDate != null ? #temporals.format(row.requiredDate, 'dd-MM-yyyy') : '-'}">-</td>
+              <td class="date-cell"
+                  th:text="${row.requestDate != null ? #temporals.format(row.requestDate, 'dd-MM-yyyy') : '-'}">-</td>
+
+              <td class="date-cell"
+                  th:text="${row.requiredDate != null ? #temporals.format(row.requiredDate, 'dd-MM-yyyy') : '-'}">-</td>
 
               <td>
                 <span th:if="${row.urgency != null}" class="badge text-white"
-                      th:style="${#strings.equalsIgnoreCase(row.urgency, 'HIGH') || #strings.equalsIgnoreCase(row.urgency, 'URGENT') || #strings.equalsIgnoreCase(row.urgency, 'CRITICAL') ? 'background-color: #c82333;' :
-                                 #strings.equalsIgnoreCase(row.urgency, 'MEDIUM') || #strings.equalsIgnoreCase(row.urgency, 'MODERATE') ? 'background-color: #e74c3c;' :
-                                 #strings.equalsIgnoreCase(row.urgency, 'LOW') || #strings.equalsIgnoreCase(row.urgency, 'ROUTINE') ? 'background-color: #fd7e14;' :
-                                 'background-color: #6c757d;'}"
+                      th:style="${#strings.equalsIgnoreCase(row.urgency, 'HIGH') ? 'background-color:#c82333;' :
+                                 #strings.equalsIgnoreCase(row.urgency, 'MEDIUM') ? 'background-color:#e74c3c;' :
+                                 #strings.equalsIgnoreCase(row.urgency, 'LOW') ? 'background-color:#fd7e14;' :
+                                 'background-color:#6c757d;'}"
                       th:text="${row.urgency}">-</span>
                 <span th:if="${row.urgency == null}" class="text-muted">-</span>
               </td>
 
-              <!-- STATUS (no 'to <hospital>' text anymore) -->
               <td>
                 <span th:if="${row.status != null}"
                       class="badge status-badge"
@@ -211,7 +214,7 @@
                                        #strings.equalsIgnoreCase(row.status, 'IN_PROGRESS') ? ' bg-primary text-white' :
                                        #strings.equalsIgnoreCase(row.status, 'CANCELLED')   ? ' bg-danger text-white'  :
                                        ' bg-secondary text-white'}"
-                      th:style="${#strings.equalsIgnoreCase(row.status, 'TRANSFERRED') ? 'background-color:#6c757d;color:#fff;' : ''}"
+                      th:style="${isTransferred ? 'background-color:#6c757d;color:#fff;' : ''}"
                       th:text="${row.status}">-</span>
                 <span th:if="${row.status == null}" class="text-muted">-</span>
               </td>
@@ -219,30 +222,32 @@
               <td th:text="${row.address} ?: '-'">-</td>
 
               <!-- ACTIONS -->
-<td class="action-cell">
-  <!-- TRANSFERRED: show a faded Complete + a View button -->
-  <div class="d-flex w-100 gap-2"
-       th:if="${#strings.equalsIgnoreCase(row.status,'TRANSFERRED')}">
-    <!-- faded/disabled Complete -->
-    <button type="button"
-            class="btn btn-success complete-btn btn-disabled"
-            disabled>
-      Complete
-    </button>
+              <td class="action-cell">
 
-    <!-- View Transferred Hospital -->
-    <button type="button"
-            class="btn btn-secondary d-flex align-items-center justify-content-center w-50"
-            data-bs-toggle="modal"
-            th:attr="data-bs-target=${'#viewTransferModal-' + row.requestId}"
-            aria-label="View transferred hospital">
-      View
-    </button>
-  </div>
+                <!-- TRANSFERRED -->
+                <div class="d-flex w-100 gap-2" th:if="${isTransferred}">
+                  <button type="button" class="btn btn-success complete-btn btn-disabled" disabled>Complete</button>
+                  <button type="button"
+                          class="btn btn-secondary d-flex align-items-center justify-content-center w-50"
+                          data-bs-toggle="modal"
+                          th:attr="data-bs-target=${'#viewTransferModal-' + row.requestId}">
+                    View
+                  </button>
+                </div>
 
-                <!-- Otherwise: normal Complete + Transfer actions -->
-                <div class="d-flex gap-2"
-                     th:if="${!#strings.equalsIgnoreCase(row.status,'TRANSFERRED')}">
+                <!-- CANCELLED: Complete faded + View (reason) -->
+                <div class="d-flex w-100 gap-2" th:if="${!isTransferred and isCancelled}">
+                  <button type="button" class="btn btn-success complete-btn btn-disabled" disabled>Complete</button>
+                  <button type="button"
+                          class="btn btn-secondary d-flex align-items-center justify-content-center w-50"
+                          data-bs-toggle="modal"
+                          th:attr="data-bs-target=${'#viewCancelModal-' + row.requestId}">
+                    View
+                  </button>
+                </div>
+
+                <!-- NORMAL: Complete + Transfer + Cancel -->
+                <div class="d-flex gap-2" th:if="${!isTransferred and !isCancelled}">
                   <form th:action="@{/admin/recipients/{id}/complete(id=${row.requestId})}" method="post" style="display:inline">
                     <input type="hidden" name="bloodTypeId" th:value="${row.bloodTypeId}">
                     <input type="hidden" name="quantity"    th:value="${row.quantity}">
@@ -253,19 +258,25 @@
                   </form>
 
                   <button type="button"
-                          class="btn btn-outline-danger transfer-btn w-50"
+                          class="btn btn-outline-danger transfer-btn"
                           data-bs-toggle="modal"
-                          th:attr="data-bs-target=${'#transferModal-' + row.requestId}"
-                          th:disabled="${#strings.equalsIgnoreCase(row.status,'COMPLETED')}">
+                          th:attr="data-bs-target=${'#transferModal-' + row.requestId}">
                     Transfer
+                  </button>
+
+                  <button type="button"
+                          class="btn btn-outline-secondary cancel-btn"
+                          data-bs-toggle="modal"
+                          th:attr="data-bs-target=${'#cancelModal-' + row.requestId}">
+                    Cancel
                   </button>
                 </div>
 
-                <!-- Transfer modal (for non-transferred rows) -->
+                <!-- Transfer modal -->
                 <div class="modal fade"
                      th:id="${'transferModal-' + row.requestId}"
                      tabindex="-1"
-                     th:if="${!#strings.equalsIgnoreCase(row.status,'TRANSFERRED')}">
+                     th:if="${!isTransferred and !isCancelled}">
                   <div class="modal-dialog">
                     <div class="modal-content">
                       <form th:action="@{/admin/recipients/{id}/transfer(id=${row.requestId})}" method="post">
@@ -282,20 +293,15 @@
                             <strong th:text="${row.hospitalName}">Hospital</strong>
                             to:
                           </p>
-<select name="targetHospitalId" class="form-select" required>
-  <option value="" disabled selected>Select target hospital</option>
-
-  <!-- Only hospitals that have sufficient stock for this row -->
-  <option th:each="h : ${hospitals}"
-          th:if="${row.eligibleTargetHospitalIds != null
-                  and #lists.contains(row.eligibleTargetHospitalIds, h.id)}"
-          th:value="${h.id}"
-          th:text="${h.hospitalName}">
-  </option>
-</select>
-
-                          <input type="hidden" name="bloodTypeId" th:value="${row.bloodTypeId}">
-                          <input type="hidden" name="quantity"    th:value="${row.quantity}">
+                          <select name="targetHospitalId" class="form-select" required>
+                            <option value="" disabled selected>Select target hospital</option>
+                            <option th:each="h : ${hospitals}"
+                                    th:if="${row.eligibleTargetHospitalIds != null
+                                            and #lists.contains(row.eligibleTargetHospitalIds, h.id)}"
+                                    th:value="${h.id}"
+                                    th:text="${h.hospitalName}">
+                            </option>
+                          </select>
                         </div>
                         <div class="modal-footer">
                           <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
@@ -306,26 +312,109 @@
                   </div>
                 </div>
 
-                <!-- View Transferred Hospital modal (shown only when transferred) -->
+<!-- Cancel modal (dropdown + conditional details) -->
+<div class="modal fade" th:id="${'cancelModal-' + row.requestId}" tabindex="-1" th:if="${!isTransferred and !isCancelled}">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form th:action="@{/admin/recipients/{id}/cancel(id=${row.requestId})}" method="post" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title">Cancel Request</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <label class="form-label fw-semibold" th:for="${'cancelReason-' + row.requestId}">
+            Please select the reason: <span class="text-danger">*</span>
+          </label>
+          <select class="form-select"
+                  name="reason"
+                  th:id="${'cancelReason-' + row.requestId}"
+                  required>
+<option value="" selected>Choose a reason</option>
+            <option>Patient Recovered</option>
+            <option>Insufficient Blood Stock in connected hospitals</option>
+            <option>No Longer Needed</option>
+            <option>Duplicate Request</option>
+            <option value="Other">Other</option>
+          </select>
+
+          <div class="mt-3" th:id="${'otherBox-' + row.requestId}" style="display:none;">
+            <label class="form-label fw-semibold" th:for="${'cancelDetails-' + row.requestId}">
+              Additional details:
+            </label>
+            <textarea class="form-control"
+                      name="details"
+                      rows="4"
+                      placeholder="Please provide additional information..."
+                      th:id="${'cancelDetails-' + row.requestId}"></textarea>
+          </div>
+
+          <small class="text-muted d-block mt-2">
+            This request will be marked as <strong>CANCELLED</strong>.
+          </small>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Back</button>
+          <button type="submit"
+                  class="btn btn-secondary"
+                  th:id="${'confirmCancel-' + row.requestId}">
+            Confirm Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+                <!-- View Transferred Hospital modal -->
                 <div class="modal fade"
                      th:id="${'viewTransferModal-' + row.requestId}"
                      tabindex="-1"
-                     th:if="${#strings.equalsIgnoreCase(row.status,'TRANSFERRED')}">
+                     th:if="${isTransferred}">
                   <div class="modal-dialog">
                     <div class="modal-content">
-<div class="modal-header">
-  <h5 class="modal-title">
-    <i class="bi bi-hospital-fill me-2 text-secondary"></i>
-    View Transferred Hospital
-  </h5>
-  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-</div>
+                      <div class="modal-header">
+                        <h5 class="modal-title">
+                          <i class="bi bi-hospital-fill me-2 text-secondary"></i>
+                          View Transferred Hospital
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                      </div>
                       <div class="modal-body">
                         <p class="mb-0">
                           This blood request was transferred to
                           <strong th:text="${row.targetHospitalName != null ? row.targetHospitalName : 'Unknown hospital'}">Target Hospital</strong>.
                         </p>
                       </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- NEW: View Cancellation Reason modal -->
+                <div class="modal fade"
+                     th:id="${'viewCancelModal-' + row.requestId}"
+                     tabindex="-1"
+                     th:if="${!isTransferred and isCancelled}">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <h5 class="modal-title">
+                          <i class="bi bi-chat-left-text me-2 text-secondary"></i>
+                          Cancellation Reason
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                      </div>
+ <div class="modal-body">
+  <p class="mb-1">This request was cancelled for the following reason:</p>
+  <div class="p-3 border rounded bg-light"
+       th:text="${row.cancelReason != null and !#strings.isEmpty(row.cancelReason)
+                ? row.cancelReason : 'No reason recorded.'}">-</div>
+</div>
                       <div class="modal-footer">
                         <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
                       </div>
@@ -495,21 +584,24 @@
       const status = (row.dataset.status || '').toLowerCase();
       const canComplete = row.dataset.canComplete === 'true';
       const completeBtn = row.querySelector('.complete-btn');
-      const transferBtn = row.querySelector('.transfer-btn');   // may be null on transferred rows
+      const transferBtn = row.querySelector('.transfer-btn');
+      const cancelBtn   = row.querySelector('.cancel-btn');
 
       if (status === 'transferred') {
-        completeBtn?.classList.add('btn-disabled'); // keep complete disabled
-        // no transfer button here; a "view" button is shown instead
+        completeBtn?.classList.add('btn-disabled');
+        cancelBtn?.classList.add('btn-disabled');
         return;
       }
-      if (status === 'completed') {
+      if (status === 'completed' || status === 'cancelled') {
         completeBtn?.classList.add('btn-disabled');
         transferBtn?.classList.add('btn-disabled');
+        cancelBtn?.classList.add('btn-disabled');
         return;
       }
 
       completeBtn?.classList.toggle('btn-disabled', !canComplete);
       transferBtn?.classList.remove('btn-disabled');
+      cancelBtn?.classList.remove('btn-disabled');
     });
   }
 
@@ -535,6 +627,26 @@ setTimeout(() => {
     alert.close();
   });
 }, 3000);
+document.querySelectorAll("[id^='cancelReason-']").forEach(sel => {
+	  const id = sel.id.split("-")[1];
+	  const otherBox = document.getElementById(`otherBox-${id}`);
+	  const details  = document.getElementById(`cancelDetails-${id}`);
+
+	  function update() {
+	    if (sel.value === 'Other') {
+	      otherBox.style.display = '';
+	      if (details) details.required = true;
+	    } else {
+	      otherBox.style.display = 'none';
+	      if (details) {
+	        details.required = false;
+	        details.value = '';
+	      }
+	    }
+	  }
+	  sel.addEventListener('change', update);
+	  update(); // initialize
+	});
 </script>
 </body>
 </html>
